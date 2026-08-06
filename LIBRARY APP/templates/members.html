@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Members - Library Management System{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <h2 style="margin: 0;">Members Management</h2>
+    <a href="{{ url_for('add_member') }}" class="btn">➕ Add New Member</a>
+</div>
+
+<div class="card">
+    {% if members %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Address</th>
+                    <th>Membership Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in members %}
+                <tr>
+                    <td>{{ member.first_name }} {{ member.last_name }}</td>
+                    <td>{{ member.email }}</td>
+                    <td>{{ member.phone }}</td>
+                    <td>{{ member.address }}</td>
+                    <td>{{ member.membership_date }}</td>
+                    <td>
+                        <span style="color: {% if member.membership_status == 'ACTIVE' %}#27ae60{% else %}#e74c3c{% endif %}; font-weight: bold;">
+                            {{ member.membership_status }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="{{ url_for('edit_member', member_id=member.member_id) }}" class="btn" style="padding: 0.5rem 1rem; font-size: 0.9rem;">✏️ Edit</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No members in the system. <a href="{{ url_for('add_member') }}">Add one now</a>.</p>
+    {% endif %}
+</div>
+{% endblock %}
