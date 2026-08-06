@@ -1,4 +1,3 @@
-app = Flask(__name__, template_folder='templates')
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_cors import CORS
 import os
