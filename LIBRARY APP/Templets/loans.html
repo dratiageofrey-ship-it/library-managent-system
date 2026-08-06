@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Loans - Library Management System{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <h2 style="margin: 0;">Loans Management</h2>
+    <a href="{{ url_for('borrow_book') }}" class="btn">➕ New Loan</a>
+</div>
+
+<div class="card">
+    {% if loans %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Book Title</th>
+                    <th>Member</th>
+                    <th>Loan Date</th>
+                    <th>Due Date</th>
+                    <th>Return Date</th>
+                    <th>Status</th>
+                    <th>Fine Amount</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for loan in loans %}
+                <tr>
+                    <td>{{ loan.title }}</td>
+                    <td>{{ loan.first_name }} {{ loan.last_name }}</td>
+                    <td>{{ loan.loan_date }}</td>
+                    <td>
+                        {% if loan.status == 'ACTIVE' and loan.due_date < now|default()|attr('date') %}
+                            <span style="color: #e74c3c; font-weight: bold;">{{ loan.due_date }} (OVERDUE)</span>
+                        {% else %}
+                            {{ loan.due_date }}
+                        {% endif %}
+                    </td>
+                    <td>{{ loan.return_date or '-' }}</td>
+                    <td>
+                        <span style="color: {% if loan.status == 'ACTIVE' %}#e74c3c{% else %}#27ae60{% endif %}; font-weight: bold;">
+                            {{ loan.status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if loan.fine_amount > 0 %}
+                            <span style="color: #e74c3c;">UGX {{ "%.0f"|format(loan.fine_amount) }}</span>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if loan.status == 'ACTIVE' %}
+                            <form method="POST" action="{{ url_for('return_book', loan_id=loan.loan_id) }}" style="display: inline;">
+                                <button type="submit" class="btn btn-success" style="padding: 0.5rem 1rem; font-size: 0.9rem;">Return</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No loans in the system. <a href="{{ url_for('borrow_book') }}">Create one now</a>.</p>
+    {% endif %}
+</div>
+{% endblock %}
