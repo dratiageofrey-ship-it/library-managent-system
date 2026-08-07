@@ -1,191 +1,281 @@
-from flask import Flask, render_template, request, redirect, url_for, session
-from datetime import datetime, timedelta
-import os
-
-app = Flask(__name__, template_folder='templates')
-app.secret_key = 'library_secret_key_2026'
-
-def get_db_connection():
-    import psycopg2
-    DB_URL = os.environ.get('DATABASE_PUBLIC_URL', 'postgresql://postgres:Library123@crossover.proxy.rlwy.net:59153/railway')
-    return psycopg2.connect(DB_URL)
-
-@app.route('/')
-def index():
-    if 'username' in session:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        if username == 'admin1' and password == 'admin123':
-            session['username'] = username
-            session['user_id'] = 1
-            return redirect(url_for('dashboard'))
-        return render_template('login.html', error='Invalid credentials')
-    return render_template('login.html')
-
-@app.route('/dashboard')
-def dashboard():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Library Management System{% endblock %}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         
-        # Get all statistics
-        cur.execute('SELECT COUNT(*) as total FROM books')
-        total_books = cur.fetchone()['total']
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
         
-        cur.execute('SELECT COUNT(*) as total FROM members')
-        total_members = cur.fetchone()['total']
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
         
-        cur.execute('SELECT COUNT(*) as total FROM loans WHERE status = %s', ('ACTIVE',))
-        active_loans = cur.fetchone()['total']
+        .navbar h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
         
-        cur.execute('SELECT COALESCE(SUM(fine_amount), 0) as total FROM fines WHERE status = %s', ('PENDING',))
-        pending_fines = cur.fetchone()['total']
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            margin-left: 2rem;
+            font-size: 0.95rem;
+            transition: opacity 0.3s;
+        }
         
-        # Get recent loans
-        cur.execute('''SELECT l.loan_id, b.title, m.first_name, m.last_name, l.loan_date, l.due_date
-                       FROM loans l 
-                       JOIN books b ON l.book_id = b.book_id 
-                       JOIN members m ON l.member_id = m.member_id 
-                       WHERE l.status = 'ACTIVE'
-                       ORDER BY l.loan_date DESC LIMIT 5''')
-        recent_loans = cur.fetchall()
+        .navbar a:hover {
+            opacity: 0.8;
+        }
         
-        cur.close()
-        conn.close()
+        .container {
+            display: flex;
+            min-height: calc(100vh - 70px);
+        }
         
-        return render_template('dashboard.html', 
-                             total_books=total_books,
-                             total_members=total_members,
-                             active_loans=active_loans,
-                             pending_fines=pending_fines,
-                             recent_loans=recent_loans)
-    except Exception as e:
-        return render_template('dashboard.html', 
-                             total_books=0, total_members=0, active_loans=0, 
-                             pending_fines=0, recent_loans=[], error=str(e))
-
-@app.route('/books')
-def books():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute('SELECT * FROM books ORDER BY book_id DESC')
-        books_list = cur.fetchall()
-        cur.close()
-        conn.close()
-        return render_template('books.html', books=books_list)
-    except Exception as e:
-        return render_template('books.html', books=[], error=str(e))
-
-@app.route('/members')
-def members():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute('SELECT * FROM members ORDER BY member_id DESC')
-        members_list = cur.fetchall()
-        cur.close()
-        conn.close()
-        return render_template('members.html', members=members_list)
-    except Exception as e:
-        return render_template('members.html', members=[], error=str(e))
-
-@app.route('/loans')
-def loans():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute('''SELECT l.loan_id, b.title, m.first_name, m.last_name, l.loan_date, l.due_date, l.return_date, l.status, l.fine_amount
-                       FROM loans l 
-                       JOIN books b ON l.book_id = b.book_id 
-                       JOIN members m ON l.member_id = m.member_id 
-                       ORDER BY l.loan_id DESC''')
-        loans_list = cur.fetchall()
-        cur.close()
-        conn.close()
-        return render_template('loans.html', loans=loans_list)
-    except Exception as e:
-        return render_template('loans.html', loans=[], error=str(e))
-
-@app.route('/fines')
-def fines():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute('''SELECT f.fine_id, m.first_name, m.last_name, f.fine_amount, f.reason, f.status, f.created_date
-                       FROM fines f 
-                       JOIN members m ON f.member_id = m.member_id 
-                       ORDER BY f.fine_id DESC''')
-        fines_list = cur.fetchall()
-        cur.close()
-        conn.close()
-        return render_template('fines.html', fines=fines_list)
-    except Exception as e:
-        return render_template('fines.html', fines=[], error=str(e))
-
-@app.route('/reports')
-def reports():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        .sidebar {
+            width: 250px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 2rem 0;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+        }
         
-        # Most borrowed books
-        cur.execute('''SELECT b.title, COUNT(l.loan_id) as borrow_count
-                       FROM books b
-                       LEFT JOIN loans l ON b.book_id = l.book_id
-                       GROUP BY b.book_id, b.title
-                       ORDER BY borrow_count DESC LIMIT 10''')
-        most_borrowed = cur.fetchall()
+        .sidebar a {
+            display: block;
+            padding: 1rem 1.5rem;
+            color: #ecf0f1;
+            text-decoration: none;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
         
-        # Overdue loans
-        cur.execute('''SELECT l.loan_id, b.title, m.first_name, m.last_name, l.due_date
-                       FROM loans l
-                       JOIN books b ON l.book_id = b.book_id
-                       JOIN members m ON l.member_id = m.member_id
-                       WHERE l.status = 'ACTIVE' AND l.due_date < %s
-                       ORDER BY l.due_date ASC''', (datetime.now().date(),))
-        overdue = cur.fetchall()
+        .sidebar a:hover,
+        .sidebar a.active {
+            background-color: #34495e;
+            border-left-color: #3498db;
+            color: white;
+        }
         
-        cur.close()
-        conn.close()
-        return render_template('reports.html', most_borrowed=most_borrowed, overdue=overdue)
-    except Exception as e:
-        return render_template('reports.html', most_borrowed=[], overdue=[], error=str(e))
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
-if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #ecf0f1;
+        }
+        
+        .header h2 {
+            font-size: 1.8rem;
+            color: #2c3e50;
+        }
+        
+        .user-info {
+            background-color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-card h3 {
+            color: #666;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-top: 1rem;
+        }
+        
+        thead {
+            background-color: #34495e;
+            color: white;
+        }
+        
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        tbody tr:hover {
+            background-color: #f9f9f9;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background-color: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #764ba2;
+        }
+        
+        .btn-danger {
+            background-color: #e74c3c;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .btn-small {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.8rem;
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #f5c6cb;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border-left: 4px solid #c3e6cb;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: #999;
+        }
+        
+        .empty-state p {
+            margin-top: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                display: flex;
+                overflow-x: auto;
+                padding: 1rem 0;
+            }
+            
+            .sidebar a {
+                flex: 0 0 auto;
+                border-left: none;
+                border-bottom: 3px solid transparent;
+                padding: 0.75rem 1rem;
+            }
+            
+            .sidebar a:hover,
+            .sidebar a.active {
+                border-left: none;
+                border-bottom-color: #3498db;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>📚 Library Management System</h1>
+        <div>
+            {% if session.get('username') %}
+                <span>Welcome, <strong>{{ session.get('username') }}</strong></span>
+                <a href="/logout">Logout</a>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="container">
+        {% if session.get('username') %}
+        <div class="sidebar">
+            <a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}">📊 Dashboard</a>
+            <a href="/books" class="{% if request.path == '/books' %}active{% endif %}">📖 Books</a>
+            <a href="/members" class="{% if request.path == '/members' %}active{% endif %}">👥 Members</a>
+            <a href="/loans" class="{% if request.path == '/loans' %}active{% endif %}">📋 Loans</a>
+            <a href="/fines" class="{% if request.path == '/fines' %}active{% endif %}">💰 Fines</a>
+            <a href="/reports" class="{% if request.path == '/reports' %}active{% endif %}">📈 Reports</a>
+        </div>
+        {% endif %}
+        
+        <div class="main-content">
+            {% if error %}
+                <div class="alert alert-error">
+                    <strong>Error:</strong> {{ error }}
+                </div>
+            {% endif %}
+            
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+</html>
