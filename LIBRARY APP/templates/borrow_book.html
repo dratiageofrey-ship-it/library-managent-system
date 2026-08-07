@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Borrow Book - Library Management System{% endblock %}
+{% block content %}
+<div class="header">
+    <h2>📋 Borrow Book</h2>
+</div>
+
+<div style="background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px;">
+    <form method="POST">
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Select Member</label>
+            <select name="member_id" required style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+                <option value="">-- Choose Member --</option>
+                {% for member in members %}
+                <option value="{{ member.member_id }}">{{ member.first_name }} {{ member.last_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Select Book</label>
+            <select name="book_id" required style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+                <option value="">-- Choose Available Book --</option>
+                {% for book in books %}
+                <option value="{{ book.book_id }}">{{ book.title }} - {{ book.author }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Loan Days (default 14)</label>
+            <input type="number" name="loan_days" value="14" min="7" max="30" style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;">
+        </div>
+        
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" class="btn" style="padding: 0.75rem 1.5rem; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">Issue Loan</button>
+            <a href="/loans" style="padding: 0.75rem 1.5rem; background: #999; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
