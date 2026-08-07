@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Loans - Library Management System{% endblock %}
+{% block content %}
+<div class="header">
+    <h2>📋 Loans</h2>
+</div>
+
+{% if loans %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Book</th>
+            <th>Member</th>
+            <th>Loan Date</th>
+            <th>Due Date</th>
+            <th>Return Date</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for loan in loans %}
+        <tr>
+            <td>{{ loan.loan_id }}</td>
+            <td>{{ loan.title }}</td>
+            <td>{{ loan.first_name }} {{ loan.last_name }}</td>
+            <td>{{ loan.loan_date }}</td>
+            <td>{{ loan.due_date }}</td>
+            <td>{{ loan.return_date if loan.return_date else 'N/A' }}</td>
+            <td>{{ loan.status }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No loans found</p>
+{% endif %}
+{% endblock %}

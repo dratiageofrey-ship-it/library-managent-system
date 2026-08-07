@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Fines - Library Management System{% endblock %}
+{% block content %}
+<div class="header">
+    <h2>💰 Fines</h2>
+</div>
+
+{% if fines %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Member</th>
+            <th>Amount</th>
+            <th>Reason</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for fine in fines %}
+        <tr>
+            <td>{{ fine.fine_id }}</td>
+            <td>{{ fine.first_name }} {{ fine.last_name }}</td>
+            <td>${{ "%.2f"|format(fine.fine_amount|float) }}</td>
+            <td>{{ fine.reason }}</td>
+            <td>{{ fine.status }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No fines found</p>
+{% endif %}
+{% endblock %}

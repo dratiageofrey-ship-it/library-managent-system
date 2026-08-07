@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Library Management System{% endblock %}
+{% block content %}
+<div class="header">
+    <h2>📊 Dashboard</h2>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Total Books</h3>
+        <div class="number">{{ total_books }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Total Members</h3>
+        <div class="number">{{ total_members }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Active Loans</h3>
+        <div class="number">{{ active_loans }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Pending Fines</h3>
+        <div class="number">${{ "%.2f"|format(pending_fines|float) }}</div>
+    </div>
+</div>
+
+<h3>Recent Loans</h3>
+{% if recent_loans %}
+<table>
+    <thead>
+        <tr>
+            <th>Loan ID</th>
+            <th>Book Title</th>
+            <th>Member Name</th>
+            <th>Loan Date</th>
+            <th>Due Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for loan in recent_loans %}
+        <tr>
+            <td>{{ loan.loan_id }}</td>
+            <td>{{ loan.title }}</td>
+            <td>{{ loan.first_name }} {{ loan.last_name }}</td>
+            <td>{{ loan.loan_date }}</td>
+            <td>{{ loan.due_date }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No active loans</p>
+{% endif %}
+{% endblock %}
