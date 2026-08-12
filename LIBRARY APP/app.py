@@ -23,7 +23,6 @@ def login():
         password = request.form.get('password')
         if username == 'admin1' and password == 'admin123':
             session['username'] = username
-            session['user_id'] = 1
             return redirect(url_for('dashboard'))
         flash('Invalid credentials', 'error')
     return render_template('login.html')
@@ -39,25 +38,23 @@ def dashboard():
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
         cur.execute('SELECT COUNT(*) as total FROM books')
-        total_books = cur.fetchone()['total'] or 0
+        r = cur.fetchone()
+        total_books = r['total'] if r else 0
+        
         cur.execute('SELECT COUNT(*) as total FROM members')
-        total_members = cur.fetchone()['total'] or 0
+        r = cur.fetchone()
+        total_members = r['total'] if r else 0
+        
         cur.execute('SELECT COUNT(*) as total FROM loans WHERE status = %s', ('ACTIVE',))
-        active_loans = cur.fetchone()['total'] or 0
-        cur.execute('SELECT COALESCE(SUM(fine_amount), 0) as total FROM fines WHERE status = %s', ('PENDING',))
-        pending_fines = cur.fetchone()['total'] or 0
+        r = cur.fetchone()
+        active_loans = r['total'] if r else 0
         
         recent_loans = []
-        if active_loans > 0:
-            cur.execute('''SELECT l.loan_id, b.title, m.first_name, m.last_name, l.loan_date, l.due_date
-                           FROM loans l JOIN books b ON l.book_id = b.book_id JOIN members m ON l.member_id = m.member_id
-                           WHERE l.status = 'ACTIVE' ORDER BY l.loan_date DESC LIMIT 5''')
-            recent_loans = cur.fetchall()
         
         cur.close()
         conn.close()
-        return render_template('dashboard.html', total_books=total_books, total_members=total_members, active_loans=active_loans, pending_fines=pending_fines, recent_loans=recent_loans)
-    except Exception as e:
+        return render_template('dashboard.html', total_books=total_books, total_members=total_members, active_loans=active_loans, pending_fines=0, recent_loans=recent_loans)
+    except:
         return render_template('dashboard.html', total_books=0, total_members=0, active_loans=0, pending_fines=0, recent_loans=[])
 
 @app.route('/books')
@@ -70,35 +67,12 @@ def books():
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute('SELECT * FROM books ORDER BY book_id DESC')
-        books_list = cur.fetchall() or []
+        books_list = list(cur.fetchall())
         cur.close()
         conn.close()
         return render_template('books.html', books=books_list)
     except:
         return render_template('books.html', books=[])
-
-@app.route('/books/add', methods=['GET', 'POST'])
-def add_book():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    if request.method == 'POST':
-        try:
-            import psycopg2
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute('''INSERT INTO books (isbn, title, author, publisher, publication_year, category, total_copies, available_copies, status)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                       (request.form['isbn'], request.form['title'], request.form['author'], request.form['publisher'],
-                        request.form['publication_year'], request.form['category'], request.form['total_copies'],
-                        request.form['total_copies'], 'AVAILABLE'))
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Book added successfully!', 'success')
-            return redirect(url_for('books'))
-        except Exception as e:
-            flash(f'Error: {str(e)}', 'error')
-    return render_template('add_book.html')
 
 @app.route('/members')
 def members():
@@ -110,34 +84,12 @@ def members():
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute('SELECT * FROM members ORDER BY member_id DESC')
-        members_list = cur.fetchall() or []
+        members_list = list(cur.fetchall())
         cur.close()
         conn.close()
         return render_template('members.html', members=members_list)
     except:
         return render_template('members.html', members=[])
-
-@app.route('/members/add', methods=['GET', 'POST'])
-def add_member():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    if request.method == 'POST':
-        try:
-            import psycopg2
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute('''INSERT INTO members (first_name, last_name, email, phone, address, membership_date, membership_status)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s)''',
-                       (request.form['first_name'], request.form['last_name'], request.form['email'], request.form['phone'],
-                        request.form['address'], datetime.now().date(), 'ACTIVE'))
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Member added successfully!', 'success')
-            return redirect(url_for('members'))
-        except Exception as e:
-            flash(f'Error: {str(e)}', 'error')
-    return render_template('add_member.html')
 
 @app.route('/loans')
 def loans():
@@ -149,82 +101,13 @@ def loans():
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute('''SELECT l.loan_id, b.title, m.first_name, m.last_name, l.loan_date, l.due_date, l.return_date, l.status
-                       FROM loans l JOIN books b ON l.book_id = b.book_id JOIN members m ON l.member_id = m.member_id ORDER BY l.loan_id DESC''')
-        loans_list = cur.fetchall() or []
+                       FROM loans l LEFT JOIN books b ON l.book_id = b.book_id LEFT JOIN members m ON l.member_id = m.member_id ORDER BY l.loan_id DESC''')
+        loans_list = list(cur.fetchall())
         cur.close()
         conn.close()
         return render_template('loans.html', loans=loans_list)
     except:
         return render_template('loans.html', loans=[])
-
-@app.route('/loans/borrow', methods=['GET', 'POST'])
-def borrow_book():
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        if request.method == 'POST':
-            member_id = request.form['member_id']
-            book_id = request.form['book_id']
-            loan_days = int(request.form.get('loan_days', 14))
-            
-            cur.execute('SELECT available_copies FROM books WHERE book_id=%s', (book_id,))
-            book = cur.fetchone()
-            
-            if not book or book['available_copies'] <= 0:
-                flash('Book not available!', 'error')
-                cur.close()
-                conn.close()
-                return redirect(url_for('borrow_book'))
-            
-            due_date = datetime.now().date() + timedelta(days=loan_days)
-            cur.execute('''INSERT INTO loans (book_id, member_id, loan_date, due_date, status, fine_amount)
-                          VALUES (%s, %s, %s, %s, %s, %s)''',
-                       (book_id, member_id, datetime.now().date(), due_date, 'ACTIVE', 0))
-            cur.execute('UPDATE books SET available_copies = available_copies - 1 WHERE book_id=%s', (book_id,))
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Book borrowed successfully!', 'success')
-            return redirect(url_for('loans'))
-        
-        cur.execute('SELECT book_id, title FROM books WHERE available_copies > 0 ORDER BY title')
-        books = cur.fetchall() or []
-        cur.execute('SELECT member_id, first_name, last_name FROM members WHERE membership_status=%s ORDER BY first_name', ('ACTIVE',))
-        members_list = cur.fetchall() or []
-        cur.close()
-        conn.close()
-        return render_template('borrow_book.html', books=books, members=members_list)
-    except:
-        return render_template('borrow_book.html', books=[], members=[])
-
-@app.route('/loans/<int:loan_id>/return', methods=['POST'])
-def return_book(loan_id):
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        cur.execute('SELECT book_id FROM loans WHERE loan_id=%s', (loan_id,))
-        loan = cur.fetchone()
-        
-        cur.execute('''UPDATE loans SET return_date=%s, status=%s WHERE loan_id=%s''',
-                   (datetime.now().date(), 'RETURNED', loan_id))
-        cur.execute('UPDATE books SET available_copies = available_copies + 1 WHERE book_id=%s', (loan['book_id'],))
-        conn.commit()
-        cur.close()
-        conn.close()
-        flash('Book returned successfully!', 'success')
-    except Exception as e:
-        flash(f'Error: {str(e)}', 'error')
-    return redirect(url_for('loans'))
 
 @app.route('/fines')
 def fines():
@@ -236,55 +119,19 @@ def fines():
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute('''SELECT f.fine_id, m.first_name, m.last_name, f.fine_amount, f.reason, f.status FROM fines f
-                       JOIN members m ON f.member_id = m.member_id ORDER BY f.fine_id DESC''')
-        fines_list = cur.fetchall() or []
+                       LEFT JOIN members m ON f.member_id = m.member_id ORDER BY f.fine_id DESC''')
+        fines_list = list(cur.fetchall())
         cur.close()
         conn.close()
         return render_template('fines.html', fines=fines_list)
     except:
         return render_template('fines.html', fines=[])
 
-@app.route('/fines/<int:fine_id>/pay', methods=['POST'])
-def pay_fine(fine_id):
-    if 'username' not in session:
-        return redirect(url_for('login'))
-    try:
-        import psycopg2
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute('UPDATE fines SET status=%s, paid_date=%s WHERE fine_id=%s', ('PAID', datetime.now().date(), fine_id))
-        conn.commit()
-        cur.close()
-        conn.close()
-        flash('Fine paid!', 'success')
-    except:
-        pass
-    return redirect(url_for('fines'))
-
 @app.route('/reports')
 def reports():
     if 'username' not in session:
         return redirect(url_for('login'))
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        cur.execute('''SELECT b.title, COUNT(l.loan_id) as borrow_count FROM books b
-                       LEFT JOIN loans l ON b.book_id = l.book_id GROUP BY b.book_id, b.title ORDER BY borrow_count DESC LIMIT 10''')
-        most_borrowed = cur.fetchall() or []
-        
-        cur.execute('''SELECT l.loan_id, b.title, m.first_name, m.last_name, l.due_date FROM loans l
-                       JOIN books b ON l.book_id = b.book_id JOIN members m ON l.member_id = m.member_id
-                       WHERE l.status='ACTIVE' AND l.due_date < %s ORDER BY l.due_date ASC''', (datetime.now().date(),))
-        overdue = cur.fetchall() or []
-        
-        cur.close()
-        conn.close()
-        return render_template('reports.html', most_borrowed=most_borrowed, overdue=overdue)
-    except:
-        return render_template('reports.html', most_borrowed=[], overdue=[])
+    return render_template('reports.html', most_borrowed=[], overdue=[])
 
 @app.route('/logout')
 def logout():
